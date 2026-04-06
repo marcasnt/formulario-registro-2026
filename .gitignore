@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+
+# Vite / TS
+*.log
+
+# Server
+server/node_modules/
+server/.env
+
+# Cursor
+.cursor/
