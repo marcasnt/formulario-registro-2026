@@ -73,6 +73,7 @@ export default function App() {
   const [idBackPreviewUrl, setIdBackPreviewUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [compressingIdImages, setCompressingIdImages] = useState(false);
 
   const downloadExcelResponse = async (res: Response) => {
     const blob = await res.blob();
@@ -146,8 +147,66 @@ export default function App() {
       return;
     }
 
-    setFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
+    const compress = async () => {
+      setCompressingIdImages(true);
+      try {
+        const maxBytes = 3.5 * 1024 * 1024; // ~3.5MB objetivo por imagen (Vercel Hobby friendly)
+        const maxDim = 2000;
+        const quality = 0.82;
+
+        const toCompressed = async (input: File) => {
+          // Si ya es pequeño, lo dejamos igual (siempre que sea JPG/PNG)
+          if (input.size <= maxBytes) return input;
+
+          const imgUrl = URL.createObjectURL(input);
+          try {
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+              const el = new Image();
+              el.onload = () => resolve(el);
+              el.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+              el.src = imgUrl;
+            });
+
+            const scale = Math.min(1, maxDim / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+            const w = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+            const h = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas no disponible.');
+            ctx.drawImage(img, 0, 0, w, h);
+
+            const blob: Blob = await new Promise((resolve, reject) => {
+              canvas.toBlob(
+                (b) => (b ? resolve(b) : reject(new Error('No se pudo comprimir la imagen.'))),
+                'image/jpeg',
+                quality
+              );
+            });
+
+            const baseName = input.name.replace(/\.(png|jpe?g)$/i, '');
+            return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+          } finally {
+            URL.revokeObjectURL(imgUrl);
+          }
+        };
+
+        const finalFile = await toCompressed(file);
+        setFile(finalFile);
+        setPreviewUrl(URL.createObjectURL(finalFile));
+      } catch {
+        setFile(null);
+        setPreviewUrl(null);
+        e.target.value = '';
+      } finally {
+        setCompressingIdImages(false);
+      }
+    };
+
+    // Fire and forget (async)
+    void compress();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -157,7 +216,7 @@ export default function App() {
 
     const data = buildFormData();
 
-    fetch('http://localhost:8787/api/submit', {
+    fetch('/api/submit', {
       method: 'POST',
       body: data,
     })
@@ -194,7 +253,7 @@ export default function App() {
     setSubmitError(null);
     const data = buildFormData();
 
-    fetch('http://localhost:8787/api/excel', {
+    fetch('/api/excel', {
       method: 'POST',
       body: data,
     })
@@ -422,7 +481,7 @@ export default function App() {
                 </div>
 
                 <p className="mt-2 text-xs text-gray-500">
-                  Solo se aceptan imágenes JPG o PNG. Se guardan localmente hasta enviar. En el Excel se incrustan las imágenes.
+                  Solo se aceptan imágenes JPG o PNG. Si pesan mucho, se comprimen automáticamente para el envío. En el Excel se incrustan las imágenes.
                 </p>
               </div>
 
@@ -788,10 +847,10 @@ export default function App() {
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || compressingIdImages}
               className="flex-1 bg-gradient-to-r from-green-600 to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-8 py-3 rounded-lg font-semibold hover:from-green-700 hover:to-green-800 disabled:hover:from-gray-400 disabled:hover:to-gray-500 transform hover:scale-105 disabled:hover:scale-100 transition-all duration-200 shadow-lg"
             >
-              {submitting ? 'Enviando...' : submitted ? '¡Formulario Enviado!' : 'Enviar Inscripción'}
+              {compressingIdImages ? 'Procesando imágenes...' : submitting ? 'Enviando...' : submitted ? '¡Formulario Enviado!' : 'Enviar Inscripción'}
             </button>
             
             <button

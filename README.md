@@ -58,17 +58,7 @@ npm run server:install
 
 ## Ejecutar en desarrollo
 
-### 1) Levantar el backend
-
-Desde la raíz:
-
-```bash
-npm run server:dev
-```
-
-Backend por defecto: `http://localhost:8787`
-
-### 2) Levantar el frontend
+### 1) Levantar el frontend
 
 En otra terminal:
 
@@ -77,6 +67,13 @@ npm run dev
 ```
 
 Vite mostrará la URL local (por ejemplo `http://localhost:5175/`).
+
+### Backend (en producción / Vercel)
+
+Este proyecto está preparado para desplegarse en **Vercel** usando **Functions** en `api/`:
+
+- `POST /api/excel`: genera y descarga el Excel
+- `POST /api/submit`: genera, descarga y envía correo
 
 ## Uso
 
@@ -101,4 +98,13 @@ En el formulario:
 
 - Este proyecto guarda archivos **en memoria** (no los escribe a disco).
 - Si el backend no inicia y ves `EADDRINUSE`, significa que el puerto está ocupado. Libera el puerto o cambia `PORT` en `server/.env`.
+
+## Deploy en Vercel
+
+1) Importa el repo en Vercel.
+2) Configura variables de entorno (Production y Preview):
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `DEST_EMAIL`
+   - (opcional) `LOGO_URL` o `LOGO_PATH`
+3) Deploy.
+
 
