@@ -285,7 +285,7 @@ export default function App() {
               />
               <div className="text-white text-center">
                 <h1 className="text-3xl font-bold mb-2">FENIFISC</h1>
-                <p className="text-lg opacity-90">Federación Nacional de Fisiculturismo</p>
+                <p className="text-lg opacity-90">Federación Nicaragüense de Fisiculturismo</p>
               </div>
             </div>
           </div>
