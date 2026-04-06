@@ -66,7 +66,8 @@ const initialFormData: AthleteData = {
 
 export default function App() {
   const [formData, setFormData] = useState<AthleteData>(initialFormData);
-  const [submitted, setSubmitted] = useState(false);
+  const [showSuccessScreen, setShowSuccessScreen] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
   const [idFrontFile, setIdFrontFile] = useState<File | null>(null);
   const [idBackFile, setIdBackFile] = useState<File | null>(null);
   const [idFrontPreviewUrl, setIdFrontPreviewUrl] = useState<string | null>(null);
@@ -227,18 +228,20 @@ export default function App() {
           throw new Error(msg);
         }
 
-        await downloadExcelResponse(res);
+        // Consumir el cuerpo (Excel) sin descargar; el usuario puede exportar desde la pantalla de éxito
+        await res.blob();
+
         const emailStatus = res.headers.get('x-email-status') || 'ok';
         const emailError = res.headers.get('x-email-error') || '';
 
-        setSubmitted(true);
-        setTimeout(() => setSubmitted(false), 3000);
-
+        setSubmitError(null);
         if (emailStatus !== 'ok') {
           setSubmitError(
-            `El Excel se generó y se descargó, pero el correo falló: ${emailError || 'credenciales SMTP inválidas'}`
+            `La inscripción se registró, pero el correo no se pudo enviar: ${emailError || 'revisa SMTP en Vercel'}`
           );
         }
+
+        setShowSuccessScreen(true);
       })
       .catch((err) => {
         const msg = err instanceof Error ? err.message : 'Error desconocido al enviar.';
@@ -251,6 +254,7 @@ export default function App() {
 
   const exportToExcel = () => {
     setSubmitError(null);
+    setExportingExcel(true);
     const data = buildFormData();
 
     fetch('/api/excel', {
@@ -268,11 +272,60 @@ export default function App() {
       .catch((err) => {
         const msg = err instanceof Error ? err.message : 'Error desconocido al exportar.';
         setSubmitError(msg);
+      })
+      .finally(() => {
+        setExportingExcel(false);
       });
   };
 
+  const resetNewAthlete = () => {
+    setFormData(initialFormData);
+    if (idFrontPreviewUrl) URL.revokeObjectURL(idFrontPreviewUrl);
+    if (idBackPreviewUrl) URL.revokeObjectURL(idBackPreviewUrl);
+    setIdFrontFile(null);
+    setIdBackFile(null);
+    setIdFrontPreviewUrl(null);
+    setIdBackPreviewUrl(null);
+    setShowSuccessScreen(false);
+    setSubmitError(null);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-amber-50 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-amber-50 py-8 px-4 relative">
+      {showSuccessScreen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center space-y-6 border-2 border-green-600">
+            <div className="text-5xl text-green-600">✓</div>
+            <h2 className="text-2xl font-bold text-gray-800">Formulario enviado exitosamente</h2>
+            <p className="text-gray-600 text-sm">
+              Tu inscripción fue procesada. Puedes descargar el Excel con todos los datos o iniciar una nueva inscripción.
+            </p>
+            {submitError && (
+              <div className="bg-amber-50 border border-amber-300 text-amber-900 text-sm px-3 py-2 rounded-lg text-left">
+                {submitError}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                type="button"
+                onClick={resetNewAthlete}
+                className="flex-1 px-6 py-3 rounded-lg border-2 border-gray-300 font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Volver al inicio (nuevo atleta)
+              </button>
+              <button
+                type="button"
+                disabled={exportingExcel}
+                onClick={exportToExcel}
+                className="flex-1 px-6 py-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 transition-colors"
+              >
+                {exportingExcel ? 'Generando Excel...' : 'Exportar Excel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto">
         {/* Header con Logo */}
         <div className="bg-white rounded-t-2xl shadow-lg overflow-hidden">
@@ -843,37 +896,18 @@ export default function App() {
             </div>
           </div>
 
-          {/* Botones de acción */}
+          {/* Botón enviar */}
           <div className="flex flex-col sm:flex-row gap-4 pt-4">
             <button
               type="submit"
               disabled={submitting || compressingIdImages}
-              className="flex-1 bg-gradient-to-r from-green-600 to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-8 py-3 rounded-lg font-semibold hover:from-green-700 hover:to-green-800 disabled:hover:from-gray-400 disabled:hover:to-gray-500 transform hover:scale-105 disabled:hover:scale-100 transition-all duration-200 shadow-lg"
+              className="w-full bg-gradient-to-r from-green-600 to-green-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-8 py-3 rounded-lg font-semibold hover:from-green-700 hover:to-green-800 disabled:hover:from-gray-400 disabled:hover:to-gray-500 transform hover:scale-105 disabled:hover:scale-100 transition-all duration-200 shadow-lg"
             >
-              {compressingIdImages ? 'Procesando imágenes...' : submitting ? 'Enviando...' : submitted ? '¡Formulario Enviado!' : 'Enviar Inscripción'}
-            </button>
-            
-            <button
-              type="button"
-              onClick={exportToExcel}
-              className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-amber-600 hover:to-amber-700 transform hover:scale-105 transition-all duration-200 shadow-lg flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
-              </svg>
-              Exportar a Excel
+              {compressingIdImages ? 'Procesando imágenes...' : submitting ? 'Enviando...' : 'Enviar Inscripción'}
             </button>
           </div>
 
-          {/* Mensaje de éxito */}
-          {submitted && (
-            <div className="bg-green-100 border-2 border-green-500 text-green-700 px-4 py-3 rounded-lg text-center font-semibold animate-pulse">
-              ¡Enviado! Se descargó el Excel y también se envió al correo configurado.
-            </div>
-          )}
-
-          {submitError && (
+          {submitError && !showSuccessScreen && (
             <div className="bg-red-100 border-2 border-red-500 text-red-700 px-4 py-3 rounded-lg text-center font-semibold">
               {submitError}
             </div>

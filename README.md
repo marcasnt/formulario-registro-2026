@@ -11,15 +11,16 @@ Además, al **Enviar Inscripción** se puede **enviar el Excel por correo** con 
 ## Tecnologías
 
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
-- **Backend**: Node.js + Express
-  - `exceljs` (generación de Excel con imágenes)
-  - `multer` (subida de archivos)
-  - `nodemailer` (envío por SMTP)
+- **Backend (producción)**: Vercel Serverless Functions (`api/`)
+  - `exceljs`, `busboy`, `nodemailer`
+- **Backend (opcional local)**: carpeta `server/` con Express (desarrollo legacy)
 
 ## Estructura del proyecto
 
 - `src/`: aplicación React (formulario)
-- `server/`: servidor Express (genera Excel y envía correo)
+- `api/`: funciones para Vercel (genera Excel y envía correo)
+- `public/`: archivos estáticos; coloca aquí **`logo.png`** o **`logo.jpg`** para el encabezado del Excel en Vercel
+- `server/`: servidor Express opcional para desarrollo local
 
 ## Requisitos
 
@@ -50,11 +51,12 @@ npm run server:install
 
 > Recomendación: en Gmail usa **Verificación en 2 pasos** y crea una **Contraseña de aplicación** para SMTP.
 
-- **Logo en el Excel (opcional)**
-  - Opción 1 (local): `LOGO_PATH=assets/logo.png` (ruta relativa desde `server/`)
-  - Opción 2 (URL): `LOGO_URL=https://.../logo.png`
+- **Logo en el Excel (Vercel)** — elige una:
+  - **Recomendado**: sube `public/logo.png` (o `public/logo.jpg`) al repo. La función intentará cargar `https://tu-dominio.vercel.app/logo.png` automáticamente.
+  - **Variable**: `LOGO_URL=https://.../logo.png` (PNG o JPG)
+  - **Opcional**: `LOGO_BASE_URL=https://tu-dominio.vercel.app` si necesitas forzar el origen
 
-> El logo debe ser **PNG o JPG**.
+> El logo debe ser **PNG o JPG** (no WebP en el Excel).
 
 ## Ejecutar en desarrollo
 
@@ -84,15 +86,10 @@ En el formulario:
   - `Classic Physique, 65 kg, Físico Clásico`
 - En **Cédula de identidad**, sube imágenes **JPG/PNG** (frente y reverso).
 
-### Botones
+### Flujo
 
-- **Exportar a Excel**
-  - Genera y descarga el Excel **con el mismo formato e imágenes** (no envía correo).
-- **Enviar Inscripción**
-  - Genera y descarga el Excel **idéntico** al de exportación
-  - Intenta **enviar el correo** con:
-    - el Excel adjunto
-    - las imágenes adjuntas por separado
+1. **Enviar Inscripción**: registra el envío, intenta enviar el correo (Excel + imágenes adjuntas) y muestra una **pantalla de éxito**.
+2. En esa pantalla puedes **Exportar Excel** (descarga) o **Volver al inicio** para inscribir a otro atleta.
 
 ## Notas importantes
 
@@ -104,7 +101,8 @@ En el formulario:
 1) Importa el repo en Vercel.
 2) Configura variables de entorno (Production y Preview):
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `DEST_EMAIL`
-   - (opcional) `LOGO_URL` o `LOGO_PATH`
-3) Deploy.
+   - (opcional) `LOGO_URL` o `LOGO_BASE_URL`
+3) Asegúrate de tener **`public/logo.png`** en el repo (o `LOGO_URL` apuntando a un PNG/JPG público).
+4) Deploy.
 
 

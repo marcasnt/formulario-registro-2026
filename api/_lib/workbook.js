@@ -26,40 +26,59 @@ function addFieldRows(ws, title, rows, startRow) {
   return r + 1;
 }
 
-async function readLogoFromEnv(wb) {
-  const LOGO_URL = process.env.LOGO_URL || '';
-  const LOGO_PATH = process.env.LOGO_PATH || '';
-  if (!LOGO_URL && !LOGO_PATH) return null;
+async function fetchLogoBuffer(url) {
+  const r = await fetch(url);
+  if (!r.ok) return null;
+  const ct = (r.headers.get('content-type') || '').toLowerCase();
+  const isPng = ct.includes('image/png');
+  const isJpg = ct.includes('image/jpeg') || ct.includes('image/jpg');
+  if (!isPng && !isJpg) return null;
+  const ab = await r.arrayBuffer();
+  return { buffer: Buffer.from(ab), extension: isPng ? 'png' : 'jpeg' };
+}
 
+/**
+ * Logo: LOGO_URL, luego LOGO_PATH (local), luego mismo origen /logo.png|jpg (Vercel: public/logo.png).
+ */
+async function readLogoFromEnv(wb, requestOrigin = '') {
   try {
-    let buffer;
-    let extension;
+    if (process.env.LOGO_URL) {
+      const got = await fetchLogoBuffer(process.env.LOGO_URL);
+      if (got) return wb.addImage({ buffer: got.buffer, extension: got.extension });
+    }
 
+    const LOGO_PATH = process.env.LOGO_PATH || '';
     if (LOGO_PATH) {
       const abs = path.isAbsolute(LOGO_PATH) ? LOGO_PATH : path.resolve(process.cwd(), LOGO_PATH);
       const ext = path.extname(abs).toLowerCase();
-      if (ext !== '.png' && ext !== '.jpg' && ext !== '.jpeg') return null;
-      buffer = await fs.readFile(abs);
-      extension = ext === '.png' ? 'png' : 'jpeg';
-    } else {
-      const r = await fetch(LOGO_URL);
-      if (!r.ok) return null;
-      const ct = (r.headers.get('content-type') || '').toLowerCase();
-      const isPng = ct.includes('image/png');
-      const isJpg = ct.includes('image/jpeg') || ct.includes('image/jpg');
-      if (!isPng && !isJpg) return null;
-      const ab = await r.arrayBuffer();
-      buffer = Buffer.from(ab);
-      extension = isPng ? 'png' : 'jpeg';
+      if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
+        const buffer = await fs.readFile(abs);
+        const extension = ext === '.png' ? 'png' : 'jpeg';
+        return wb.addImage({ buffer, extension });
+      }
     }
 
-    return wb.addImage({ buffer, extension });
+    const bases = [];
+    const o = (requestOrigin || '').replace(/\/$/, '');
+    if (o) bases.push(o);
+    if (process.env.VERCEL_URL) {
+      bases.push(`https://${String(process.env.VERCEL_URL).replace(/^https?:\/\//, '')}`);
+    }
+
+    for (const base of bases) {
+      for (const p of ['/logo.png', '/logo.jpg']) {
+        const got = await fetchLogoBuffer(`${base}${p}`);
+        if (got) return wb.addImage({ buffer: got.buffer, extension: got.extension });
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }
 }
 
-export async function buildWorkbook({ fields, files }) {
+export async function buildWorkbook({ fields, files, requestOrigin = '' }) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Inscripción Atleta');
 
@@ -164,7 +183,7 @@ export async function buildWorkbook({ fields, files }) {
   ws.getCell('A3').alignment = { vertical: 'middle', horizontal: 'center' };
 
   // Logos (izq/der) con tamaño exacto
-  const logoImgId = await readLogoFromEnv(wb);
+  const logoImgId = await readLogoFromEnv(wb, requestOrigin);
   if (logoImgId) {
     const logoW = cmToPx(2.99);
     const logoH = cmToPx(2.69);

@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { buildWorkbook } from './_lib/workbook.js';
 import { parseMultipart } from './_lib/multipart.js';
+import { getRequestOrigin } from './_lib/origin.js';
 
 function requireEnv(name) {
   const v = process.env[name];
@@ -48,10 +49,12 @@ export default async function handler(req, res) {
 
   try {
     const { fields, files } = await parseMultipart(req);
+    const requestOrigin = getRequestOrigin(req);
 
     const { workbook, fileNameBase } = await buildWorkbook({
       fields,
       files: { idFront: files.idFront, idBack: files.idBack },
+      requestOrigin,
     });
 
     const buffer = await workbook.xlsx.writeBuffer();

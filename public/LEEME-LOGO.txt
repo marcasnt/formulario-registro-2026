@@ -1,0 +1,6 @@
+Para que el logo aparezca en el Excel en Vercel:
+
+1) Coloca aquí un archivo llamado logo.png o logo.jpg (PNG o JPG, no WebP).
+2) Haz commit y push. La URL será: https://TU-DOMINIO.vercel.app/logo.png
+
+Alternativa: en Vercel define la variable LOGO_URL con la URL completa de una imagen PNG/JPG.
